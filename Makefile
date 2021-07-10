@@ -1,26 +1,27 @@
 BUILD := DEBUG
 VERSION := $(shell git describe --tags)
 
-FLAGS := -Wall -Wpedantic -std=c++11 -MMD -MP
-DEBUG_FLAGS := -Og -g -DDEBUG
-RELEASE_FLAGS := -O3
-DEFINES := -DVERSION=\"$(VERSION)\"
-
-CXXFLAGS += $(FLAGS) $($(BUILD)_FLAGS) $(DEFINES)
-LDLIBS += -lpthread -lusb-1.0
-SOURCES := $(wildcard *.cpp) $(wildcard */*.cpp)
-OBJECTS := $(SOURCES:.cpp=.o) firmware.o
-DEPENDENCIES := $(SOURCES:.cpp=.d)
-
-DRIVER_URL := http://download.windowsupdate.com/c/msdownload/update/driver/drvs/2017/07/1cd6a87c-623f-4407-a52d-c31be49e925c_e19f60808bdcbfbd3c3df6be3e71ffc52e43261e.cab
-FIRMWARE_HASH := 48084d9fa53b9bb04358f3bb127b7495dc8f7bb0b3ca1437bd24ef2b6eabdf66
-
 PREFIX := /usr/local
 BINDIR := $(PREFIX)/bin
+FIRMDIR := /lib/firmware
 UDEVDIR := /etc/udev/rules.d
 MODLDIR := /etc/modules-load.d
 MODPDIR := /etc/modprobe.d
 SYSDDIR := /etc/systemd/system
+
+FLAGS := -Wall -Wpedantic -std=c++11 -MMD -MP
+DEBUG_FLAGS := -Og -g -DDEBUG
+RELEASE_FLAGS := -O3
+DEFINES := -DVERSION=\"$(VERSION)\" -DFIRMWARE_PATH=\"$(FIRMDIR)\"
+
+CXXFLAGS += $(FLAGS) $($(BUILD)_FLAGS) $(DEFINES)
+LDLIBS += -lpthread -lusb-1.0
+SOURCES := $(wildcard *.cpp) $(wildcard */*.cpp)
+OBJECTS := $(SOURCES:.cpp=.o)
+DEPENDENCIES := $(SOURCES:.cpp=.d)
+
+DRIVER_URL := http://download.windowsupdate.com/c/msdownload/update/driver/drvs/2017/07/1cd6a87c-623f-4407-a52d-c31be49e925c_e19f60808bdcbfbd3c3df6be3e71ffc52e43261e.cab
+FIRMWARE_HASH := 48084d9fa53b9bb04358f3bb127b7495dc8f7bb0b3ca1437bd24ef2b6eabdf66
 
 .PHONY: all
 all: xow
@@ -30,9 +31,6 @@ xow: $(OBJECTS)
 
 %.o: %.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c -o $@ $<
-
-firmware.o: firmware.bin
-	$(LD) -r -b binary -z noexecstack -o $@ $<
 
 firmware.bin:
 	curl -o driver.cab $(DRIVER_URL)
@@ -49,6 +47,7 @@ install: xow
 	install -D -m 644 install/modules.conf $(DESTDIR)$(MODLDIR)/xow-uinput.conf
 	install -D -m 644 install/modprobe.conf $(DESTDIR)$(MODPDIR)/xow-blacklist.conf
 	install -D -m 644 xow.service $(DESTDIR)$(SYSDDIR)/xow.service
+	install -D -m 644 firmware.bin $(DESTDIR)$(FIRMWARE_DIR)/xow_dongle.bin
 	$(RM) xow.service
 
 .PHONY: uninstall

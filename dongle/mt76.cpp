@@ -20,6 +20,7 @@
 #include "../utils/log.h"
 
 #include <chrono>
+#include <fstream>
 
 #define BITS_PER_LONG (sizeof(long) * 8)
 #define BIT(nr) (1UL << (nr))
@@ -780,6 +781,8 @@
 
 /* The defines below belong to this project */
 
+#define FIRMWARE_BIN FIRMWARE_PATH "/xow_dongle.bin"
+
 // Poll timeout
 #define MT_TIMEOUT_POLL std::chrono::seconds(1)
 
@@ -808,9 +811,6 @@
 // Channel power limits (0 dB to 23.5 dB)
 #define MT_CH_POWER_MIN 0x00
 #define MT_CH_POWER_MAX 0x2f
-
-extern const uint8_t _binary_firmware_bin_start[];
-extern const uint8_t _binary_firmware_bin_end[];
 
 Mt76::Mt76(
     std::unique_ptr<UsbDevice> usbDevice
@@ -1450,10 +1450,32 @@ bool Mt76::loadFirmware()
     controlWrite(MT_FCE_PDMA_GLOBAL_CONF, 0x44);
     controlWrite(MT_FCE_SKIP_FS, 0x03);
 
+    std::ifstream file(FIRMWARE_BIN, std::ios::binary | std::ios::ate);
+    if (!file)
+    {
+        Log::error("Failed to find firmware");
+
+        return false;
+    }
+
+    size_t size = file.tellg();
+    file.seekg(0, std::ios::beg);
+
+    uint8_t* firmware_buf = new uint8_t[size];
+    if (!file.read((char*)firmware_buf, size))
+    {
+        Log::error("Failed to load firmware into memory");
+        delete[] firmware_buf;
+
+        return false;
+    }
+
     const Bytes firmware(
-        _binary_firmware_bin_start,
-        _binary_firmware_bin_end
+        firmware_buf,
+        firmware_buf+size
     );
+
+    delete[] firmware_buf;
 
     const FwHeader *header = firmware.toStruct<FwHeader>();
     Bytes::Iterator ilmStart = firmware.begin() + sizeof(FwHeader);
